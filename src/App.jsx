@@ -1188,8 +1188,6 @@ const ItemsView = ({ locations, onRefresh }) => {
     filter === 'all' || item.category === parseInt(filter)
   );
 
-  const stores = locations.filter(l => l.is_store);
-
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
@@ -1316,12 +1314,12 @@ const ItemsView = ({ locations, onRefresh }) => {
         )}
       </div>
 
-      {/* Item Form Modal */}
+      {/* Item Form Modal - FIXED: Pass locations instead of stores */}
       {showForm && (
         <ItemFormModal
           item={editingItem}
           categories={categories}
-          stores={stores}
+          locations={locations} 
           onClose={() => {
             setShowForm(false);
             setEditingItem(null);
@@ -1339,73 +1337,92 @@ const ItemsView = ({ locations, onRefresh }) => {
 };
 
 // Item Form Modal
-const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
+const ItemFormModal = ({ item, categories, locations, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    category: '',
-    description: '',
-    acct_unit: '',
-    specifications: '',
-    default_location: '',
+    name: "",
+    code: "",
+    category: "",
+    description: "",
+    acct_unit: "",
+    specifications: "",
+    default_location: "",
     reorder_level: 0,
     reorder_quantity: 0,
-    is_active: true
+    is_active: true,
   });
 
   useEffect(() => {
     if (item) {
       setFormData({
-        name: item.name || '',
-        code: item.code || '',
-        category: item.category || '',
-        description: item.description || '',
-        acct_unit: item.acct_unit || '',
-        specifications: item.specifications || '',
-        default_location: item.default_location || '',
+        name: item.name || "",
+        code: item.code || "",
+        category: item.category || "",
+        description: item.description || "",
+        acct_unit: item.acct_unit || "",
+        specifications: item.specifications || "",
+        default_location: item.default_location || "",
         reorder_level: item.reorder_level || 0,
         reorder_quantity: item.reorder_quantity || 0,
-        is_active: item.is_active !== undefined ? item.is_active : true
+        is_active: item.is_active !== undefined ? item.is_active : true,
       });
     }
   }, [item]);
+
+  // Debug logging - can be removed after verification
+  useEffect(() => {
+    console.log('ItemFormModal received locations:', locations);
+    if (locations) {
+      console.log('Total locations count:', locations.length);
+      console.log('Sample location structure:', locations[0]);
+    }
+  }, [locations]);
+
+  // Filter only top-level (standalone) locations - locations without parents
+  // Check for null, undefined, empty string, and false (but not 0 which could be a valid ID)
+  const standaloneLocations = (locations || []).filter(loc => {
+    // Return true if parent_location is null, undefined, empty string, or not present
+    return !loc.parent_location || loc.parent_location === null || loc.parent_location === '';
+  });
+
+  // Debug logging
+  console.log('Standalone locations count:', standaloneLocations.length);
+  console.log('Standalone locations:', standaloneLocations);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.category) {
-      alert('Please select a category');
+      alert("Please select a category");
       return;
     }
 
     if (!formData.default_location) {
-      alert('Please select a default location');
+      alert("Please select a default location");
       return;
     }
 
     try {
-      const url = item 
+      const url = item
         ? `${API_BASE}/items/${item.id}/`
         : `${API_BASE}/items/`;
-      
-      const method = item ? 'PUT' : 'POST';
+      const method = item ? "PUT" : "POST";
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       });
 
       if (res.ok) {
-        alert(item ? 'Item updated successfully!' : 'Item created successfully!');
+        alert(item ? "Item updated successfully!" : "Item created successfully!");
         onSuccess();
       } else {
         const error = await res.json();
-        alert('Error: ' + JSON.stringify(error));
+        alert("Error: " + JSON.stringify(error));
       }
     } catch (error) {
-      console.error('Error saving item:', error);
-      alert('Error saving item');
+      console.error("Error saving item:", error);
+      alert("Error saving item");
     }
   };
 
@@ -1413,13 +1430,14 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
         <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
-          <h3 className="text-base font-semibold">{item ? 'Edit Item' : 'New Item'}</h3>
+          <h3 className="text-base font-semibold">{item ? "Edit Item" : "New Item"}</h3>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          {/* Name & Code */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium mb-1">Item Name *</label>
@@ -1427,7 +1445,7 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 border rounded text-sm"
                 placeholder="e.g., Laptop, Chair, Projector"
               />
@@ -1438,24 +1456,25 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
                 type="text"
                 required
                 value={formData.code}
-                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 className="w-full px-3 py-2 border rounded text-sm"
                 placeholder="e.g., LAP-001, CHR-001"
               />
             </div>
           </div>
 
+          {/* Category & Default Location */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium mb-1">Category *</label>
               <select
                 required
                 value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full px-3 py-2 border rounded text-sm"
               >
                 <option value="">Select Category</option>
-                {categories.map(cat => (
+                {categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name} ({cat.code})
                   </option>
@@ -1463,57 +1482,71 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Default Location (Store) *</label>
+              <label className="block text-xs font-medium mb-1">Default Location *</label>
               <select
                 required
                 value={formData.default_location}
-                onChange={(e) => setFormData({...formData, default_location: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, default_location: e.target.value })}
                 className="w-full px-3 py-2 border rounded text-sm"
               >
-                <option value="">Select Store</option>
-                {stores.map(store => (
-                  <option key={store.id} value={store.id}>
-                    {store.name}
-                  </option>
-                ))}
+                <option value="">Select Location</option>
+                {standaloneLocations.length === 0 ? (
+                  <option disabled>No standalone locations available</option>
+                ) : (
+                  standaloneLocations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} {loc.location_type ? `(${loc.location_type})` : ''}
+                    </option>
+                  ))
+                )}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {standaloneLocations.length === 0 
+                  ? 'No standalone locations found. Please create parent locations first.'
+                  : `Showing ${standaloneLocations.length} top-level location(s)`
+                }
+              </p>
             </div>
           </div>
 
+          {/* Accounting Unit */}
           <div>
             <label className="block text-xs font-medium mb-1">Accounting Unit *</label>
             <input
               type="text"
               required
               value={formData.acct_unit}
-              onChange={(e) => setFormData({...formData, acct_unit: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, acct_unit: e.target.value })}
               className="w-full px-3 py-2 border rounded text-sm"
               placeholder="e.g., Piece, Unit, Set, Kg, Liter"
             />
           </div>
 
+          {/* Description */}
           <div>
             <label className="block text-xs font-medium mb-1">Description</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-3 py-2 border rounded text-sm"
               rows="2"
               placeholder="Brief description of the item"
             />
           </div>
 
+          {/* Specifications */}
           <div>
             <label className="block text-xs font-medium mb-1">Specifications</label>
             <textarea
               value={formData.specifications}
-              onChange={(e) => setFormData({...formData, specifications: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
               className="w-full px-3 py-2 border rounded text-sm"
               rows="3"
               placeholder="Technical specifications, model number, features, etc."
             />
           </div>
 
+          {/* Reorder Settings */}
           <div className="border-t pt-3">
             <h4 className="text-sm font-semibold mb-3">Reorder Settings</h4>
             <div className="grid grid-cols-2 gap-3">
@@ -1523,7 +1556,9 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
                   type="number"
                   min="0"
                   value={formData.reorder_level}
-                  onChange={(e) => setFormData({...formData, reorder_level: parseInt(e.target.value) || 0})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reorder_level: parseInt(e.target.value) || 0 })
+                  }
                   className="w-full px-3 py-2 border rounded text-sm"
                   placeholder="Minimum quantity threshold"
                 />
@@ -1535,7 +1570,9 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
                   type="number"
                   min="0"
                   value={formData.reorder_quantity}
-                  onChange={(e) => setFormData({...formData, reorder_quantity: parseInt(e.target.value) || 0})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reorder_quantity: parseInt(e.target.value) || 0 })
+                  }
                   className="w-full px-3 py-2 border rounded text-sm"
                   placeholder="Suggested reorder amount"
                 />
@@ -1544,18 +1581,20 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
             </div>
           </div>
 
+          {/* Active Checkbox */}
           <div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={formData.is_active}
-                onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                 className="cursor-pointer"
               />
               <span className="text-sm font-medium">Active</span>
             </label>
           </div>
 
+          {/* Buttons */}
           <div className="flex justify-end gap-2 pt-3">
             <button
               type="button"
@@ -1568,7 +1607,7 @@ const ItemFormModal = ({ item, categories, stores, onClose, onSuccess }) => {
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
             >
-              {item ? 'Update' : 'Create'} Item
+              {item ? "Update" : "Create"} Item
             </button>
           </div>
         </form>
@@ -1772,6 +1811,7 @@ const StockEntriesView = ({ stockEntries, locations, items, onRefresh }) => {
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('all');
   const [selectedEntry, setSelectedEntry] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const viewEntryDetails = async (id) => {
     try {
@@ -1779,6 +1819,7 @@ const StockEntriesView = ({ stockEntries, locations, items, onRefresh }) => {
       if (res.ok) {
         const data = await res.json();
         setSelectedEntry(data);
+        setShowDetailsModal(true);
       }
     } catch (error) {
       console.error('Error fetching entry details:', error);
@@ -1786,9 +1827,6 @@ const StockEntriesView = ({ stockEntries, locations, items, onRefresh }) => {
   };
 
   const returnTemporaryItems = async (id) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Confirm return of temporarily issued items?')) return;
-    
     try {
       const res = await fetch(`${API_BASE}/stock-entries/${id}/return_temporary_items/`, {
         method: 'POST'
@@ -1796,26 +1834,33 @@ const StockEntriesView = ({ stockEntries, locations, items, onRefresh }) => {
       
       if (res.ok) {
         const data = await res.json();
-        alert(`Items returned successfully!\nReturned: ${data.returned}\nReceipt Entry: ${data.receipt_entry_number}`);
+        alert(`Items returned successfully!\n\nReturned: ${data.returned}\nReceipt Entry: ${data.receipt_entry_number}\n\n${data.message}`);
         onRefresh();
-        setSelectedEntry(null);
+        if (selectedEntry && selectedEntry.id === id) {
+          setShowDetailsModal(false);
+          setSelectedEntry(null);
+        }
       } else {
         const error = await res.json();
         alert('Error: ' + JSON.stringify(error));
       }
     } catch (error) {
       console.error('Error returning items:', error);
+      alert('Error returning items');
     }
   };
 
-  const filteredEntries = stockEntries.filter(entry => 
-    filter === 'all' || entry.entry_type === filter.toUpperCase()
-  );
+  const filteredEntries = stockEntries.filter(entry => {
+    return filter === 'all' || entry.entry_type === filter.toUpperCase();
+  });
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Stock Entries</h2>
+        <div>
+          <h2 className="text-xl font-semibold">Stock Entries</h2>
+          <p className="text-sm text-gray-500 mt-1">Track all inventory movements and transactions</p>
+        </div>
         <button
           onClick={() => setShowForm(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
@@ -1826,7 +1871,7 @@ const StockEntriesView = ({ stockEntries, locations, items, onRefresh }) => {
 
       {/* Filter */}
       <div className="flex gap-2 mb-4">
-        {['all', 'receipt', 'issue', 'correction'].map((f) => (
+        {['all', 'issue', 'receipt', 'correction'].map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -1843,78 +1888,134 @@ const StockEntriesView = ({ stockEntries, locations, items, onRefresh }) => {
 
       {/* Entries List */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Entry No</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Type</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">From</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">To</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Item</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Qty</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Status</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filteredEntries.map((entry) => (
-              <tr key={entry.id} className="hover:bg-gray-50">
-                <td className="px-4 py-2.5 text-sm font-medium">{entry.entry_number}</td>
-                <td className="px-4 py-2.5 text-sm">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    entry.is_temporary ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {entry.entry_type}
-                    {entry.is_temporary && ' (TEMP)'}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-sm">{entry.from_location_name || '-'}</td>
-                <td className="px-4 py-2.5 text-sm">{entry.to_location_name || '-'}</td>
-                <td className="px-4 py-2.5 text-sm">{entry.item_name}</td>
-                <td className="px-4 py-2.5 text-sm">{entry.quantity}</td>
-                <td className="px-4 py-2.5">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    entry.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                    entry.status === 'PENDING_ACK' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {entry.status}
-                    {entry.is_overdue && ' ⚠️'}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => viewEntryDetails(entry.id)}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      View
-                    </button>
-                    {entry.is_temporary && entry.status === 'COMPLETED' && !entry.actual_return_date && (
+        {filteredEntries.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <ArrowUpDown size={48} className="mx-auto mb-3 text-gray-300" />
+            <p>No stock entries found</p>
+            <p className="text-sm mt-2">Create your first stock entry to start tracking inventory movements</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Entry No</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Type</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">From</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">To</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Item</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Qty</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Date</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Status</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-600">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredEntries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-sm">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono font-medium">{entry.entry_number}</span>
+                        
+                        {/* Show if this is a correction */}
+                        {entry.entry_type === 'CORRECTION' && entry.reference_entry_number && (
+                          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs inline-flex items-center gap-1 w-fit">
+                            <AlertCircle size={12} />
+                            Corrects: {entry.reference_entry_number}
+                          </span>
+                        )}
+                        
+                        {/* Show if this entry has been corrected */}
+                        {entry.remarks && entry.remarks.includes('CORRECTED by') && (
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs inline-flex items-center gap-1 w-fit">
+                            <AlertCircle size={12} />
+                            Corrected
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-sm">
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-2 py-1 rounded text-xs font-medium inline-block w-fit ${
+                          entry.entry_type === 'CORRECTION' ? 'bg-orange-100 text-orange-700' :
+                          entry.entry_type === 'ISSUE' ? 'bg-blue-100 text-blue-700' :
+                          entry.entry_type === 'RECEIPT' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {entry.entry_type}
+                        </span>
+                        
+                        {/* Show TEMPORARY badge only for ISSUE entries that are temporary AND not yet returned */}
+                        {entry.is_temporary === true && entry.entry_type === 'ISSUE' && !entry.actual_return_date && (
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs inline-flex items-center gap-1 w-fit">
+                            <Clock size={10} />
+                            TEMPORARY
+                          </span>
+                        )}
+                        
+                        {/* Show RETURNED badge for temporary issues that have been returned */}
+                        {entry.is_temporary === true && entry.entry_type === 'ISSUE' && entry.actual_return_date && (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs inline-flex items-center gap-1 w-fit">
+                            <CheckCircle size={10} />
+                            RETURNED
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-sm">{entry.from_location_name || '-'}</td>
+                    <td className="px-4 py-2.5 text-sm">{entry.to_location_name || '-'}</td>
+                    <td className="px-4 py-2.5 text-sm">{entry.item_name}</td>
+                    <td className="px-4 py-2.5 text-sm text-center font-medium">{entry.quantity}</td>
+                    <td className="px-4 py-2.5 text-sm text-gray-600">
+                      {new Date(entry.entry_date).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-2 py-1 rounded text-xs font-medium inline-block ${
+                          entry.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                          entry.status === 'PENDING_ACK' ? 'bg-yellow-100 text-yellow-700' :
+                          entry.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {entry.status}
+                        </span>
+                        {entry.is_overdue && (
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs inline-flex items-center gap-1">
+                            <Clock size={12} />
+                            Overdue
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
                       <button
-                        onClick={() => returnTemporaryItems(entry.id)}
-                        className="text-green-600 hover:text-green-800 text-sm"
+                        onClick={() => viewEntryDetails(entry.id)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
                       >
-                        Return
+                        View
                       </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Entry Details Modal */}
-      {selectedEntry && (
+      {showDetailsModal && selectedEntry && (
         <EntryDetailsModal
           entry={selectedEntry}
-          onClose={() => setSelectedEntry(null)}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedEntry(null);
+          }}
+          onReturnItems={returnTemporaryItems}
         />
       )}
-
-      {/* Create Form Modal */}
+      
+      {/* Stock Entry Form Modal */}
       {showForm && (
         <StockEntryFormModal
           locations={locations}
@@ -1931,95 +2032,392 @@ const StockEntriesView = ({ stockEntries, locations, items, onRefresh }) => {
 };
 
 // Entry Details Modal
-const EntryDetailsModal = ({ entry, onClose }) => {
+const EntryDetailsModal = ({ entry, onClose, onAcknowledge }) => {
+  const [instances, setInstances] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [returnEntries, setReturnEntries] = useState([]);
+
+  useEffect(() => {
+    if (entry) {
+      fetchInstances();
+      if (entry.is_temporary && entry.entry_type === 'ISSUE') {
+        fetchReturnEntries();
+      }
+    }
+  }, [entry]);
+
+  const fetchInstances = async () => {
+    if (!entry.instances_details || entry.instances_details.length === 0) return;
+    
+    setLoading(true);
+    try {
+      const instanceIds = entry.instances_details.map(inst => inst.id);
+      const promises = instanceIds.map(id => 
+        fetch(`${API_BASE}/item-instances/${id}/`).then(res => res.json())
+      );
+      const data = await Promise.all(promises);
+      setInstances(data);
+    } catch (error) {
+      console.error('Error fetching instances:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch receipt entries that returned items from this temporary issue
+  const fetchReturnEntries = async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE}/stock-entries/?entry_type=RECEIPT&from_location=${entry.to_location}&to_location=${entry.from_location}&item=${entry.item}`
+      );
+      if (res.ok) {
+        const allReceipts = await res.json();
+        // Filter receipts that happened after this issue and involve the same instances
+        const relevantReturns = allReceipts.filter(receipt => {
+          const receiptDate = new Date(receipt.created_at);
+          const issueDate = new Date(entry.created_at);
+          return receiptDate > issueDate;
+        });
+        setReturnEntries(relevantReturns);
+      }
+    } catch (error) {
+      console.error('Error fetching return entries:', error);
+    }
+  };
+
+  const handleAcknowledge = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/stock-entries/${entry.id}/acknowledge/`, {
+        method: 'POST'
+      });
+      
+      if (res.ok) {
+        alert('Entry acknowledged successfully!');
+        onAcknowledge();
+      } else {
+        const error = await res.json();
+        alert('Error: ' + JSON.stringify(error));
+      }
+    } catch (error) {
+      console.error('Error acknowledging entry:', error);
+      alert('Error acknowledging entry');
+    }
+  };
+
+  if (!entry) return null;
+
+  // Calculate return status for temporary issues
+  const getReturnStatus = () => {
+    if (!entry.is_temporary || entry.entry_type !== 'ISSUE') return null;
+    
+    if (entry.actual_return_date) {
+      return { status: 'fully_returned', color: 'green', text: 'Fully Returned' };
+    }
+
+    // Check if any instances were returned based on their current location
+    const returnedCount = instances.filter(inst => inst.current_location === entry.from_location).length;
+    const totalCount = instances.length;
+
+    if (returnedCount === 0) {
+      return { status: 'not_returned', color: 'yellow', text: 'Not Returned Yet' };
+    } else if (returnedCount < totalCount) {
+      return { status: 'partially_returned', color: 'blue', text: `Partially Returned (${returnedCount}/${totalCount})` };
+    } else {
+      return { status: 'fully_returned', color: 'green', text: 'Fully Returned' };
+    }
+  };
+
+  const returnStatus = getReturnStatus();
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
         <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
-          <h3 className="text-base font-semibold">Entry Details: {entry.entry_number}</h3>
+          <h3 className="text-lg font-semibold">Stock Entry Details</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Entry Header */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-500">Entry Number</p>
+                <p className="font-semibold text-lg">{entry.entry_number}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Status</p>
+                <span className={`inline-block px-3 py-1 rounded text-sm font-medium ${
+                  entry.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                  entry.status === 'PENDING_ACK' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {entry.status}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Temporary Issue Return Status */}
+          {returnStatus && (
+            <div className={`rounded-lg p-4 ${
+              returnStatus.color === 'green' ? 'bg-green-50 border border-green-200' :
+              returnStatus.color === 'blue' ? 'bg-blue-50 border border-blue-200' :
+              'bg-yellow-50 border border-yellow-200'
+            }`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-sm mb-1">Temporary Issue Return Status</p>
+                  <p className={`text-sm ${
+                    returnStatus.color === 'green' ? 'text-green-700' :
+                    returnStatus.color === 'blue' ? 'text-blue-700' :
+                    'text-yellow-700'
+                  }`}>
+                    {returnStatus.text}
+                  </p>
+                  {entry.expected_return_date && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Expected Return: {new Date(entry.expected_return_date).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  returnStatus.color === 'green' ? 'bg-green-100 text-green-700' :
+                  returnStatus.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {returnStatus.status === 'fully_returned' ? '✓' : returnStatus.status === 'partially_returned' ? '◐' : '○'}
+                </span>
+              </div>
+
+              {/* Show return entries */}
+              {returnEntries.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Return History:</p>
+                  {returnEntries.map(returnEntry => (
+                    <div key={returnEntry.id} className="text-xs text-gray-600 mb-1">
+                      • {returnEntry.entry_number} - {returnEntry.quantity} item(s) returned on {new Date(returnEntry.created_at).toLocaleDateString()}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Entry Details Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Entry Type</p>
+              <p className="font-medium">{entry.entry_type}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Date</p>
+              <p className="font-medium">{new Date(entry.created_at).toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Item</p>
+              <p className="font-medium">{entry.item_name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Quantity</p>
+              <p className="font-medium">{entry.quantity}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">From Location</p>
+              <p className="font-medium">{entry.from_location_name || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">To Location</p>
+              <p className="font-medium">{entry.to_location_name || 'N/A'}</p>
+            </div>
+            {entry.is_temporary && (
+              <>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Temporary Issue</p>
+                  <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                    Yes
+                  </span>
+                </div>
+                {entry.temporary_recipient && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Recipient</p>
+                    <p className="font-medium">{entry.temporary_recipient}</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Purpose and Remarks */}
+          {entry.purpose && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Purpose</p>
+              <p className="text-sm">{entry.purpose}</p>
+            </div>
+          )}
+          {entry.remarks && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Remarks</p>
+              <p className="text-sm">{entry.remarks}</p>
+            </div>
+          )}
+
+          {/* Reference Entry */}
+          {entry.reference_entry_number && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <p className="text-xs font-medium text-orange-900 mb-1">Correction Entry</p>
+              <p className="text-sm text-orange-800">
+                References: {entry.reference_entry_number}
+              </p>
+            </div>
+          )}
+
+          {/* Instances */}
+          {instances.length > 0 && (
+            <div>
+              <h4 className="font-semibold mb-2">Item Instances</h4>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Instance Code</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Condition</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Current Status</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Current Location</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {loading ? (
+                      <tr>
+                        <td colSpan="4" className="px-3 py-4 text-center text-gray-500">
+                          Loading instances...
+                        </td>
+                      </tr>
+                    ) : (
+                      instances.map((inst) => (
+                        <tr key={inst.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 font-mono">{inst.instance_code}</td>
+                          <td className="px-3 py-2">{inst.condition}</td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              inst.current_status === 'IN_STORE' ? 'bg-green-100 text-green-700' :
+                              inst.current_status === 'TEMPORARY_ISSUED' ? 'bg-purple-100 text-purple-700' :
+                              inst.current_status === 'ISSUED' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {inst.current_status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{inst.current_location_name}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Acknowledge Button */}
+          {entry.status === 'PENDING_ACK' && (
+            <div className="flex justify-end pt-4 border-t">
+              <button
+                onClick={handleAcknowledge}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Acknowledge Receipt
+              </button>
+            </div>
+          )}
+
+          {/* Close Button */}
+          <div className="flex justify-end pt-4 border-t">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border rounded hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Instance Movement Modal
+const InstanceMovementModal = ({ instance, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+      <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
+        <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+          <div>
+            <h3 className="text-base font-semibold">Instance Movement History</h3>
+            <p className="text-xs text-gray-500 mt-0.5 font-mono">{instance.instance.instance_code}</p>
+          </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <X size={18} />
           </button>
         </div>
         
-        <div className="p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600">Type:</span>
-              <span className="ml-2 font-medium">{entry.entry_type}</span>
+        <div className="p-4">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 mb-4 border border-blue-200">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-gray-600 text-xs">Item</span>
+                <p className="font-medium">{instance.instance.item_name}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 text-xs">Current Status</span>
+                <p className="font-medium">{instance.instance.current_status}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 text-xs">Current Location</span>
+                <p className="font-medium">{instance.instance.current_location_name}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 text-xs">Condition</span>
+                <p className="font-medium">{instance.instance.condition}</p>
+              </div>
             </div>
-            <div>
-              <span className="text-gray-600">Status:</span>
-              <span className="ml-2 font-medium">{entry.status}</span>
-            </div>
-            <div>
-              <span className="text-gray-600">From:</span>
-              <span className="ml-2 font-medium">{entry.from_location_name || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-600">To:</span>
-              <span className="ml-2 font-medium">{entry.to_location_name || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-600">Item:</span>
-              <span className="ml-2 font-medium">{entry.item_name}</span>
-            </div>
-            <div>
-              <span className="text-gray-600">Quantity:</span>
-              <span className="ml-2 font-medium">{entry.quantity}</span>
-            </div>
-            {entry.is_temporary && (
-              <>
-                <div>
-                  <span className="text-gray-600">Expected Return:</span>
-                  <span className="ml-2 font-medium">{entry.expected_return_date || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Actual Return:</span>
-                  <span className="ml-2 font-medium">{entry.actual_return_date || 'Not returned'}</span>
-                </div>
-              </>
-            )}
           </div>
 
-          {entry.purpose && (
-            <div className="text-sm">
-              <span className="text-gray-600">Purpose:</span>
-              <p className="mt-1 p-2 bg-gray-50 rounded">{entry.purpose}</p>
-            </div>
-          )}
-
-          {entry.remarks && (
-            <div className="text-sm">
-              <span className="text-gray-600">Remarks:</span>
-              <p className="mt-1 p-2 bg-gray-50 rounded">{entry.remarks}</p>
-            </div>
-          )}
-
-          {entry.instances_details && entry.instances_details.length > 0 && (
+          {instance.movement_history && instance.movement_history.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold mb-2">Instances</h4>
-              <div className="border rounded overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs">Instance Code</th>
-                      <th className="px-3 py-2 text-left text-xs">Status</th>
-                      <th className="px-3 py-2 text-left text-xs">Condition</th>
-                      <th className="px-3 py-2 text-left text-xs">Location</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {entry.instances_details.map((inst) => (
-                      <tr key={inst.id}>
-                        <td className="px-3 py-2 font-mono text-xs">{inst.instance_code}</td>
-                        <td className="px-3 py-2">{inst.current_status}</td>
-                        <td className="px-3 py-2">{inst.condition}</td>
-                        <td className="px-3 py-2">{inst.current_location_name}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <MapPin size={16} />
+                Movement History ({instance.movement_history.length} records)
+              </h4>
+              <div className="space-y-2">
+                {instance.movement_history.map((mov, idx) => (
+                  <div key={idx} className="border-l-4 border-blue-500 pl-4 py-3 bg-gray-50 rounded-r hover:bg-gray-100 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                          <span className="text-gray-700">{mov.from_location_name || 'N/A'}</span>
+                          <span className="text-gray-400">→</span>
+                          <span className="text-gray-700">{mov.to_location_name || 'N/A'}</span>
+                        </div>
+                        <div className="flex gap-4 text-xs text-gray-600">
+                          <span>
+                            Status: <span className="font-medium text-gray-800">{mov.previous_status}</span> → <span className="font-medium text-gray-800">{mov.new_status}</span>
+                          </span>
+                        </div>
+                        {mov.remarks && (
+                          <p className="text-xs text-gray-600 mt-2 italic bg-white p-2 rounded border border-gray-200">
+                            {mov.remarks}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right text-xs text-gray-500 ml-4">
+                        <div>{new Date(mov.moved_at).toLocaleDateString()}</div>
+                        <div className="text-gray-400">{new Date(mov.moved_at).toLocaleTimeString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -2028,7 +2426,6 @@ const EntryDetailsModal = ({ entry, onClose }) => {
     </div>
   );
 };
-
 
 const InspectionFormModal = ({ locations, items, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -3070,8 +3467,11 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
     expected_return_date: '',
     temporary_recipient: '',
     auto_create_instances: false,
-    reference_entry: null  // Add reference entry field
+    reference_entry: null
   });
+
+  const [fromParentLocation, setFromParentLocation] = useState('');
+  const [toParentLocation, setToParentLocation] = useState('');
 
   const [availableInstances, setAvailableInstances] = useState([]);
   const [selectedInstances, setSelectedInstances] = useState([]);
@@ -3079,17 +3479,50 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
   const [pendingTempIssues, setPendingTempIssues] = useState([]);
   const [selectedTempIssue, setSelectedTempIssue] = useState('');
   const [manualInstanceCodes, setManualInstanceCodes] = useState('');
+  
+  const [showTempIssueDetails, setShowTempIssueDetails] = useState(false);
+  const [tempIssueInstances, setTempIssueInstances] = useState([]);
 
-  // Reference Entry Search State
   const [entrySearchTerm, setEntrySearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchingEntries, setSearchingEntries] = useState(false);
   const [selectedReferenceEntry, setSelectedReferenceEntry] = useState(null);
 
-  const stores = locations.filter(l => l.is_store);
-  const nonStores = locations.filter(l => !l.is_store);
+  const standaloneLocations = locations.filter(l => !l.parent_location);
+  
+  const getChildLocationsForParent = (parentId) => {
+    if (!parentId) return [];
+    return locations.filter(l => l.parent_location === parseInt(parentId));
+  };
 
-  // Search for stock entries by entry number
+  const getStoresForParent = (parentId) => {
+    if (!parentId) return [];
+    return locations.filter(l => l.is_store && l.parent_location === parseInt(parentId));
+  };
+
+  const getFromChildLocations = () => {
+    if (!fromParentLocation) return [];
+    
+    if (formData.entry_type === 'ISSUE') {
+      return getStoresForParent(fromParentLocation);
+    } else {
+      return getChildLocationsForParent(fromParentLocation);
+    }
+  };
+  
+  const getToChildLocations = () => {
+    if (!toParentLocation) return [];
+    
+    if (formData.entry_type === 'RECEIPT') {
+      return getStoresForParent(toParentLocation);
+    } else {
+      return getChildLocationsForParent(toParentLocation);
+    }
+  };
+
+  const fromChildLocations = getFromChildLocations();
+  const toChildLocations = getToChildLocations();
+
   const searchStockEntries = async (searchTerm) => {
     if (!searchTerm || searchTerm.length < 3) {
       setSearchResults([]);
@@ -3101,7 +3534,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
       const res = await fetch(`${API_BASE}/stock-entries/`);
       if (res.ok) {
         const data = await res.json();
-        // Filter entries that match the search term
         const filtered = data.filter(entry => 
           entry.entry_number.toLowerCase().includes(searchTerm.toLowerCase())
         );
@@ -3114,7 +3546,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
     }
   };
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       if (formData.entry_type === 'CORRECTION' && entrySearchTerm) {
@@ -3125,22 +3556,33 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
     return () => clearTimeout(timer);
   }, [entrySearchTerm, formData.entry_type]);
 
-  // Handle reference entry selection
   const selectReferenceEntry = (entry) => {
     setSelectedReferenceEntry(entry);
     setFormData(prev => ({ 
       ...prev, 
       reference_entry: entry.id,
-      // Auto-fill related fields from the reference entry
       item: entry.item.toString(),
       from_location: entry.from_location?.toString() || '',
       to_location: entry.to_location?.toString() || '',
     }));
+    
+    if (entry.from_location) {
+      const fromLoc = locations.find(l => l.id === entry.from_location);
+      if (fromLoc && fromLoc.parent_location) {
+        setFromParentLocation(fromLoc.parent_location.toString());
+      }
+    }
+    if (entry.to_location) {
+      const toLoc = locations.find(l => l.id === entry.to_location);
+      if (toLoc && toLoc.parent_location) {
+        setToParentLocation(toLoc.parent_location.toString());
+      }
+    }
+    
     setEntrySearchTerm(entry.entry_number);
     setSearchResults([]);
   };
 
-  // Clear reference entry
   const clearReferenceEntry = () => {
     setSelectedReferenceEntry(null);
     setFormData(prev => ({ ...prev, reference_entry: null }));
@@ -3148,24 +3590,13 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
     setSearchResults([]);
   };
 
-  // Determine destination based on entry type
-  const getDestinationOptions = () => {
-    if (formData.entry_type === 'ISSUE') {
-      return locations;
-    } else if (formData.entry_type === 'RECEIPT') {
-      return stores;
-    }
-    return locations;
-  };
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, from_location: '' }));
+  }, [fromParentLocation]);
 
-  const getSourceOptions = () => {
-    if (formData.entry_type === 'ISSUE') {
-      return stores;
-    } else if (formData.entry_type === 'RECEIPT') {
-      return locations;
-    }
-    return locations;
-  };
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, to_location: '' }));
+  }, [toParentLocation]);
 
   const isDestinationStore = () => {
     if (!formData.to_location) return false;
@@ -3191,54 +3622,118 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
     } else {
       setPendingTempIssues([]);
       setSelectedTempIssue('');
+      setShowTempIssueDetails(false);
+      setTempIssueInstances([]);
     }
   }, [formData.entry_type, formData.from_location]);
 
   const fetchPendingTempIssues = async (locationId) => {
     try {
+      // Get all temporary issues to this location
       const res = await fetch(`${API_BASE}/stock-entries/?entry_type=ISSUE&is_temporary=true&status=COMPLETED`);
       if (res.ok) {
-        const data = await res.json();
-        const relevant = data.filter(entry => 
+        const allIssues = await res.json();
+        const relevantIssues = allIssues.filter(entry => 
           entry.to_location === parseInt(locationId) && !entry.actual_return_date
         );
-        setPendingTempIssues(relevant);
+        
+        // For each issue, check which instances are actually still at the location
+        const issuesWithAvailableInstances = await Promise.all(
+          relevantIssues.map(async (issue) => {
+            try {
+              // Fetch instances that are still temporarily issued at this location
+              const instRes = await fetch(
+                `${API_BASE}/item-instances/?location=${locationId}&item=${issue.item}&status=TEMPORARY_ISSUED`
+              );
+              
+              if (instRes.ok) {
+                const availableInsts = await instRes.json();
+                
+                // Cross-reference with original issue instances
+                const issueInstanceIds = issue.instances_details?.map(i => i.id) || [];
+                const stillAtLocation = availableInsts.filter(inst => 
+                  issueInstanceIds.includes(inst.id)
+                );
+                
+                return {
+                  ...issue,
+                  available_instance_count: stillAtLocation.length,
+                  available_instances: stillAtLocation
+                };
+              }
+              return { ...issue, available_instance_count: 0, available_instances: [] };
+            } catch (error) {
+              console.error('Error checking instances for issue:', issue.id, error);
+              return { ...issue, available_instance_count: 0, available_instances: [] };
+            }
+          })
+        );
+        
+        // Only show issues that still have unreturned instances
+        const issuesWithUnreturnedItems = issuesWithAvailableInstances.filter(
+          issue => issue.available_instance_count > 0
+        );
+        
+        setPendingTempIssues(issuesWithUnreturnedItems);
       }
     } catch (error) {
       console.error('Error fetching pending temp issues:', error);
     }
   };
 
-  useEffect(() => {
-    if (selectedTempIssue) {
-      const issue = pendingTempIssues.find(i => i.id === parseInt(selectedTempIssue));
-      if (issue) {
-        setFormData(prev => ({
-          ...prev,
-          from_location: issue.to_location.toString(),
-          to_location: issue.from_location.toString(),
-          item: issue.item.toString(),
-          quantity: issue.quantity,
-          purpose: `Return from temporary issue ${issue.entry_number}`,
-        }));
-        if (issue.instances_details) {
-          setSelectedInstances(issue.instances_details.map(inst => inst.id));
-        }
+  const handleTempIssueSelection = async (issueId) => {
+    setSelectedTempIssue(issueId);
+    
+    if (!issueId) {
+      setShowTempIssueDetails(false);
+      setTempIssueInstances([]);
+      setSelectedInstances([]);
+      return;
+    }
+
+    const issue = pendingTempIssues.find(i => i.id === parseInt(issueId));
+    if (issue) {
+      setFormData(prev => ({
+        ...prev,
+        from_location: issue.to_location.toString(),
+        to_location: issue.from_location.toString(),
+        item: issue.item.toString(),
+        purpose: `Return from temporary issue ${issue.entry_number}`,
+      }));
+      
+      const fromLoc = locations.find(l => l.id === issue.to_location);
+      const toLoc = locations.find(l => l.id === issue.from_location);
+      if (fromLoc && fromLoc.parent_location) {
+        setFromParentLocation(fromLoc.parent_location.toString());
+      }
+      if (toLoc && toLoc.parent_location) {
+        setToParentLocation(toLoc.parent_location.toString());
+      }
+      
+      // Use the available_instances we already fetched
+      if (issue.available_instances && issue.available_instances.length > 0) {
+        setTempIssueInstances(issue.available_instances);
+        setShowTempIssueDetails(true);
+        setSelectedInstances([]);
+      } else {
+        alert('No instances available for return from this issue.');
+        setSelectedTempIssue('');
       }
     }
-  }, [selectedTempIssue]);
+  };
 
   useEffect(() => {
     const shouldFetch = formData.from_location && formData.item && 
-      (formData.entry_type !== 'RECEIPT' || !formData.auto_create_instances);
+      (formData.entry_type !== 'RECEIPT' || !formData.auto_create_instances) &&
+      !selectedTempIssue;
     
     if (shouldFetch) {
       fetchAvailableInstances();
-    } else {
+    } else if (!selectedTempIssue) {
       setAvailableInstances([]);
       setSelectedInstances([]);
     }
-  }, [formData.from_location, formData.item, formData.auto_create_instances, formData.entry_type]);
+  }, [formData.from_location, formData.item, formData.auto_create_instances, formData.entry_type, selectedTempIssue]);
 
   const fetchAvailableInstances = async () => {
     setLoadingInstances(true);
@@ -3275,8 +3770,12 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
   };
 
   const selectAllInstances = () => {
-    const allIds = availableInstances.slice(0, formData.quantity).map(inst => inst.id);
-    setSelectedInstances(allIds);
+    if (showTempIssueDetails) {
+      setSelectedInstances(tempIssueInstances.map(inst => inst.id));
+    } else {
+      const allIds = availableInstances.slice(0, formData.quantity).map(inst => inst.id);
+      setSelectedInstances(allIds);
+    }
   };
 
   useEffect(() => {
@@ -3320,9 +3819,8 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
     if (formData.entry_type === 'ISSUE' && !formData.from_location) {
-      alert('Please select a source store');
+      alert('Please select a source location');
       return;
     }
 
@@ -3336,7 +3834,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
       return;
     }
 
-    // CORRECTION-specific validation
     if (formData.entry_type === 'CORRECTION') {
       if (!formData.reference_entry) {
         alert('Please select a reference entry to correct');
@@ -3351,7 +3848,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
         return;
       }
     } else {
-      // For non-correction entries
       if (!formData.auto_create_instances && selectedInstances.length === 0) {
         alert('Please select instances or enable auto-create');
         return;
@@ -3362,7 +3858,7 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
       ...formData,
       instances: selectedInstances.length > 0 ? selectedInstances : undefined,
       expected_return_date: formData.expected_return_date || null,
-      reference_entry: formData.reference_entry || null,  // Ensure this is sent
+      reference_entry: formData.reference_entry || null,
     };
 
     try {
@@ -3376,10 +3872,13 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
         const data = await res.json();
         if (formData.entry_type === 'CORRECTION') {
           alert(`Correction entry created successfully!\nEntry: ${data.entry_number}\nReference: ${data.reference_entry_number || selectedReferenceEntry?.entry_number}`);
+        } else if (formData.entry_type === 'RECEIPT') {
+          alert(`Receipt entry created successfully!\nEntry: ${data.entry_number}\nReturned ${selectedInstances.length} item(s)`);
         } else {
           alert(`Stock entry created successfully!\nEntry: ${data.entry_number}`);
         }
-        onSuccess();
+        onSuccess(); // This should refresh the stock entries list
+        onClose(); // Close the modal
       } else {
         const error = await res.json();
         console.error('Error response:', error);
@@ -3409,7 +3908,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
               value={formData.entry_type}
               onChange={(e) => {
                 setFormData({...formData, entry_type: e.target.value});
-                // Clear reference entry when changing type
                 if (e.target.value !== 'CORRECTION') {
                   clearReferenceEntry();
                 }
@@ -3422,7 +3920,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </select>
           </div>
 
-          {/* Reference Entry Search - Only for CORRECTION */}
           {formData.entry_type === 'CORRECTION' && (
             <div className="border rounded p-3 bg-orange-50">
               <label className="block text-sm font-medium mb-2">Reference Entry to Correct *</label>
@@ -3447,7 +3944,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
                     Type at least 3 characters to search for stock entries
                   </p>
 
-                  {/* Search Results */}
                   {searchResults.length > 0 && (
                     <div className="mt-2 border rounded max-h-48 overflow-y-auto bg-white">
                       {searchResults.map((entry) => (
@@ -3489,7 +3985,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
                   )}
                 </>
               ) : (
-                /* Selected Reference Entry Display */
                 <div className="bg-white border rounded p-3">
                   <div className="flex justify-between items-start mb-2">
                     <div>
@@ -3540,7 +4035,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* Info message for CORRECTION */}
           {formData.entry_type === 'CORRECTION' && selectedReferenceEntry && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
               <p className="text-blue-800">
@@ -3550,71 +4044,195 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* Show pending temp issues for RECEIPT from non-store */}
           {formData.entry_type === 'RECEIPT' && pendingTempIssues.length > 0 && (
             <div className="border rounded p-3 bg-purple-50">
-              <label className="block text-sm font-medium mb-2">Pending Temporary Issues (Optional)</label>
+              <label className="block text-sm font-medium mb-2">Pending Temporary Issues</label>
               <select
                 value={selectedTempIssue}
-                onChange={(e) => setSelectedTempIssue(e.target.value)}
+                onChange={(e) => handleTempIssueSelection(e.target.value)}
                 className="w-full px-3 py-2 border rounded text-sm"
               >
                 <option value="">-- Select a pending issue or enter manually --</option>
                 {pendingTempIssues.map(issue => (
                   <option key={issue.id} value={issue.id}>
-                    {issue.entry_number} - {issue.item_name} ({issue.quantity} items) - {issue.temporary_recipient || 'N/A'}
+                    {issue.entry_number} - {issue.item_name} ({issue.available_instance_count} unreturned) - {issue.temporary_recipient || 'N/A'}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-gray-600 mt-1">
-                Or leave empty to manually enter instance codes below
+                Select a temporary issue to return items, or leave empty to manually enter
               </p>
             </div>
           )}
 
-          {/* Source and Destination - Rest of the form remains the same */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {formData.entry_type === 'ISSUE' ? 'From Store *' : 'From Location'}
-              </label>
-              <select
-                value={formData.from_location}
-                onChange={(e) => setFormData({...formData, from_location: e.target.value})}
-                className="w-full px-3 py-2 border rounded text-sm"
-                required={formData.entry_type !== 'RECEIPT'}
-                disabled={formData.entry_type === 'CORRECTION' && selectedReferenceEntry}
-              >
-                <option value="">Select Location</option>
-                {getSourceOptions().map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} {loc.is_store && '(Store)'}
-                  </option>
-                ))}
-              </select>
+          {showTempIssueDetails && tempIssueInstances.length > 0 && (
+            <div className="border rounded p-3 bg-blue-50">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-sm font-semibold text-blue-900">
+                  Select Items to Return
+                </h4>
+                <button
+                  type="button"
+                  onClick={selectAllInstances}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  Select All ({tempIssueInstances.length})
+                </button>
+              </div>
+              <p className="text-xs text-blue-700 mb-2">
+                These are the items still at the temporary location. Choose which ones to return.
+              </p>
+              <div className="bg-white border rounded max-h-48 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left">Select</th>
+                      <th className="px-2 py-1.5 text-left">Instance Code</th>
+                      <th className="px-2 py-1.5 text-left">Condition</th>
+                      <th className="px-2 py-1.5 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {tempIssueInstances.map((inst) => (
+                      <tr 
+                        key={inst.id} 
+                        className={`hover:bg-gray-50 cursor-pointer ${
+                          selectedInstances.includes(inst.id) ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={() => toggleInstanceSelection(inst.id)}
+                      >
+                        <td className="px-2 py-1.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedInstances.includes(inst.id)}
+                            onChange={() => {}}
+                            className="cursor-pointer"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 font-mono">{inst.instance_code}</td>
+                        <td className="px-2 py-1.5">{inst.condition}</td>
+                        <td className="px-2 py-1.5">
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                            {inst.current_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {selectedInstances.length > 0 && (
+                <div className="mt-2 p-2 bg-green-50 rounded text-xs text-green-800">
+                  ✓ Selected: {selectedInstances.length} of {tempIssueInstances.length} item(s) to return
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {formData.entry_type === 'RECEIPT' ? 'To Store *' : 'To Location *'}
-              </label>
-              <select
-                required
-                value={formData.to_location}
-                onChange={(e) => setFormData({...formData, to_location: e.target.value})}
-                className="w-full px-3 py-2 border rounded text-sm"
-                disabled={formData.entry_type === 'CORRECTION' && selectedReferenceEntry}
-              >
-                <option value="">Select Location</option>
-                {getDestinationOptions().map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} {loc.is_store && '(Store)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
 
-          {/* Show info about store-to-store transfer */}
+          {!selectedTempIssue && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">
+                  {formData.entry_type === 'ISSUE' ? 'From Location *' : 'From Location'}
+                </label>
+                
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">1. Select Parent Location</label>
+                  <select
+                    value={fromParentLocation}
+                    onChange={(e) => setFromParentLocation(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    disabled={formData.entry_type === 'CORRECTION' && selectedReferenceEntry}
+                  >
+                    <option value="">Select Parent Location</option>
+                    {standaloneLocations.map(loc => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} ({loc.location_type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {fromParentLocation && (
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      2. Select {formData.entry_type === 'ISSUE' ? 'Store' : 'Location'}
+                    </label>
+                    <select
+                      value={formData.from_location}
+                      onChange={(e) => setFormData({...formData, from_location: e.target.value})}
+                      className="w-full px-3 py-2 border rounded text-sm"
+                      required={formData.entry_type !== 'RECEIPT'}
+                      disabled={formData.entry_type === 'CORRECTION' && selectedReferenceEntry}
+                    >
+                      <option value="">Select {formData.entry_type === 'ISSUE' ? 'Store' : 'Location'}</option>
+                      {fromChildLocations.map(child => (
+                        <option key={child.id} value={child.id}>
+                          {child.name} {child.is_store ? '(Store)' : `(${child.location_type || 'Location'})`}
+                        </option>
+                      ))}
+                    </select>
+                    {fromChildLocations.length === 0 && (
+                      <p className="text-xs text-red-600 mt-1">
+                        No {formData.entry_type === 'ISSUE' ? 'stores' : 'locations'} found under this parent
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">
+                  {formData.entry_type === 'RECEIPT' ? 'To Location *' : 'To Location *'}
+                </label>
+                
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">1. Select Parent Location</label>
+                  <select
+                    value={toParentLocation}
+                    onChange={(e) => setToParentLocation(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    disabled={formData.entry_type === 'CORRECTION' && selectedReferenceEntry}
+                  >
+                    <option value="">Select Parent Location</option>
+                    {standaloneLocations.map(loc => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} ({loc.location_type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {toParentLocation && (
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      2. Select {formData.entry_type === 'RECEIPT' ? 'Store' : 'Location'}
+                    </label>
+                    <select
+                      required
+                      value={formData.to_location}
+                      onChange={(e) => setFormData({...formData, to_location: e.target.value})}
+                      className="w-full px-3 py-2 border rounded text-sm"
+                      disabled={formData.entry_type === 'CORRECTION' && selectedReferenceEntry}
+                    >
+                      <option value="">Select {formData.entry_type === 'RECEIPT' ? 'Store' : 'Location'}</option>
+                      {toChildLocations.map(child => (
+                        <option key={child.id} value={child.id}>
+                          {child.name} {child.is_store ? '(Store)' : `(${child.location_type || 'Location'})`}
+                        </option>
+                      ))}
+                    </select>
+                    {toChildLocations.length === 0 && (
+                      <p className="text-xs text-red-600 mt-1">
+                        No {formData.entry_type === 'RECEIPT' ? 'stores' : 'locations'} found under this parent
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {formData.entry_type === 'ISSUE' && formData.to_location && isDestinationStore() && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
               <p className="font-medium text-yellow-800">Store-to-Store Transfer</p>
@@ -3624,7 +4242,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* Show info about temporary issue */}
           {formData.entry_type === 'ISSUE' && formData.to_location && !isDestinationStore() && (
             <div className="p-3 bg-purple-50 border border-purple-200 rounded text-sm">
               <p className="font-medium text-purple-800">Temporary Issue</p>
@@ -3641,7 +4258,7 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
               value={formData.item}
               onChange={(e) => setFormData({...formData, item: e.target.value})}
               className="w-full px-3 py-2 border rounded text-sm"
-              disabled={formData.entry_type === 'CORRECTION' && selectedReferenceEntry}
+              disabled={(formData.entry_type === 'CORRECTION' && selectedReferenceEntry) || selectedTempIssue}
             >
               <option value="">Select Item</option>
               {items.map(item => (
@@ -3650,7 +4267,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </select>
           </div>
 
-          {/* Temporary Issue Details */}
           {formData.is_temporary && formData.entry_type === 'ISSUE' && (
             <div className="border rounded p-3 bg-blue-50 space-y-2">
               <div>
@@ -3677,7 +4293,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* Auto-create instances option for RECEIPT */}
           {formData.entry_type === 'RECEIPT' && !selectedTempIssue && (
             <div className="border rounded p-2 bg-yellow-50">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -3692,7 +4307,7 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </div>
           )}
 
-          {!formData.auto_create_instances && (
+          {!formData.auto_create_instances && !showTempIssueDetails && (
             <div>
               <label className="block text-sm font-medium mb-1">Quantity</label>
               <input
@@ -3707,8 +4322,7 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* Instance Selection - continues as before... */}
-          {formData.from_location && formData.item && !formData.auto_create_instances && (
+          {formData.from_location && formData.item && !formData.auto_create_instances && !showTempIssueDetails && (
             <div className="border-t pt-3">
               <div className="flex justify-between items-center mb-2">
                 <h4 className="text-sm font-semibold">
@@ -3726,7 +4340,6 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
                 )}
               </div>
 
-              {/* Manual Instance Code Entry */}
               <div className="mb-3 p-2 bg-gray-50 rounded">
                 <label className="block text-xs font-medium mb-1">Or Enter Instance Codes Manually:</label>
                 <textarea
@@ -3790,7 +4403,7 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
                 </div>
               )}
               
-              {selectedInstances.length > 0 && (
+              {selectedInstances.length > 0 && !showTempIssueDetails && (
                 <div className="mt-2 text-xs text-gray-600">
                   Selected: {selectedInstances.length} instance(s)
                 </div>
@@ -3836,8 +4449,10 @@ const StockEntryFormModal = ({ locations, items, onClose, onSuccess }) => {
                 (!formData.auto_create_instances && 
                 formData.from_location && 
                 formData.item &&
-                selectedInstances.length === 0) ||
-                (formData.entry_type === 'CORRECTION' && !formData.reference_entry)
+                selectedInstances.length === 0 &&
+                !showTempIssueDetails) ||
+                (formData.entry_type === 'CORRECTION' && !formData.reference_entry) ||
+                (showTempIssueDetails && selectedInstances.length === 0)
               }
             >
               Create Entry
